@@ -4,6 +4,19 @@ namespace LC3_Simulator;
 
 public static class Compiler
 {
+    private static int _currentLineIndex = 0;
+    private static string _currentLine = "";
+    public static void RegisterWarning(string message)
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"Warning: {message}");
+        if (_currentLine != "")
+        {
+            Console.WriteLine($"Near line {_currentLineIndex + 1} --> {_currentLine.Trim()}");
+        }
+        Console.ResetColor();
+    }
+
     public static byte GetRegisterCode(string register)
     {
         return (byte)(register[1] - '0');
@@ -12,18 +25,35 @@ public static class Compiler
     public static ushort ParseNumber(string number, byte bits)
     {
         var mask = (1 << bits) - 1;
-        return (ushort)(number[1] switch
+        int parsed;
+        try
         {
-            '$' => int.Parse(number[2..], System.Globalization.NumberStyles.HexNumber) & mask,
-            'b' => int.Parse(number[2..], System.Globalization.NumberStyles.BinaryNumber) & mask,
-            _ => int.Parse(number[1..]) & mask
-        });
+            parsed = number[1] switch
+            {
+                '$' => int.Parse(number[2..], System.Globalization.NumberStyles.HexNumber),
+                'b' => int.Parse(number[2..], System.Globalization.NumberStyles.BinaryNumber),
+                _ => int.Parse(number[1..])
+            };
+        }
+        catch (FormatException e)
+        {
+            throw new FormatException($"Could not parse number {number}: Invalid Format", e);
+        }
+        if (parsed > mask || parsed < 0)
+        {
+            RegisterWarning($"Number {number} (parsed to {(uint)parsed}) is too large for {bits} bits, this can cause unexpected behavior");
+        }
+        return (ushort)(parsed & mask);
     }
     
     public static bool ParseInstruction(string line, [NotNullWhen(true)] out ushort? instruction)
     {
         ushort outInstruction = 0;
         instruction = null;
+        if (line.Contains(';'))
+        {
+            line = line[..line.IndexOf(';')];
+        }
         var elements = line.Trim().Split(' ');
         if (elements.Length == 0 || elements[0].Length == 0)
         {
@@ -220,12 +250,12 @@ public static class Compiler
         var tmpInstructions = new LC3Instruction?[Simulator.MemorySize];
         var instructionIndex = 0;
         var lines = File.ReadAllLines(inputFile);
-        for (var index = 0; index < lines.Length; index++)
+        for (_currentLineIndex = 0; _currentLineIndex < lines.Length; _currentLineIndex++)
         {
-            var line = lines[index];
+            _currentLine = lines[_currentLineIndex];
             try
             {
-                if (ParseInstruction(line, out var instruction))
+                if (ParseInstruction(_currentLine, out var instruction))
                 {
                     tmpInstructions[instructionIndex++] = new LC3Instruction(instruction.Value);
                 }
@@ -238,7 +268,7 @@ public static class Compiler
             {
                 Console.Error.WriteLine($"""
                                          Error: Could not compile program
-                                         Near line {index + 1} --> {line}
+                                         Near line {_currentLineIndex + 1} --> {_currentLine.Trim()}
 
                                          {e.Message}
                                          """);

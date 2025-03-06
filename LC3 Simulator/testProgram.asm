@@ -9,7 +9,7 @@
         ADD R0 R0 #10
         ADD R1 R1 #$1F ; R1 = 0 - 1 = 65535
         ADD R2 R2 #$1
-        ADD R3 R1 R2   ; but, this should give 0 but mem dump says 2
+        ADD R3 R1 R2   ; bug, this should give 0 but mem dump says 2
         JSRR R0
         TRAP
         
