@@ -250,6 +250,7 @@ public static class Compiler
         var tmpInstructions = new LC3Instruction?[Simulator.MemorySize];
         var instructionIndex = 0;
         var lines = File.ReadAllLines(inputFile);
+        var hasErrors = false;
         for (_currentLineIndex = 0; _currentLineIndex < lines.Length; _currentLineIndex++)
         {
             _currentLine = lines[_currentLineIndex];
@@ -266,15 +267,24 @@ public static class Compiler
             }
             catch (Exception e)
             {
+                Console.ForegroundColor = ConsoleColor.Red;
                 Console.Error.WriteLine($"""
-                                         Error: Could not compile program
+                                         Error: {e.Message}
                                          Near line {_currentLineIndex + 1} --> {_currentLine.Trim()}
-
-                                         {e.Message}
                                          """);
-                instructions = null;
-                return false;
+                Console.ResetColor();
+                hasErrors = true;
             }
+        }
+        
+        if (hasErrors)
+        {
+            Console.Error.WriteLine("""
+                                    Could not compile program
+                                    Please fix the above errors and try again
+                                    """);
+            instructions = null;
+            return false;
         }
 
         instructions = new LC3Instruction[Simulator.MemorySize];
