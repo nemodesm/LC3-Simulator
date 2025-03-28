@@ -1,0 +1,10 @@
+        loc #$3000
+        LD R1 #2
+        LD R2 #0
+        ST R1 #15
+        ST R2 #15
+        TRAP
+        
+        loc #10
+        AND R4 R0 R1   ; R4 = 10 & 65535 = 10
+        RET            ; return from subroutine

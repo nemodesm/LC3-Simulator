@@ -37,4 +37,31 @@ public class LC3Instruction
     {
         return (byte)((Instruction >> index) & 1);
     }
+    
+    protected bool Equals(LC3Instruction? other) => Instruction == other?.Instruction;
+
+    public override bool Equals(object? obj)
+    {
+        if (obj is null) return false;
+        if (ReferenceEquals(this, obj)) return true;
+        if (obj.GetType() != GetType()) return false;
+        return Equals((LC3Instruction)obj);
+    }
+
+    public override int GetHashCode() => Instruction.GetHashCode();
+    
+    public static bool operator ==(LC3Instruction? left, LC3Instruction? right)
+    {
+        return left?.Equals(right) ?? right is null;
+    }
+
+    public static bool operator !=(LC3Instruction? left, LC3Instruction? right)
+    {
+        return !(left == right);
+    }
+
+    public override string ToString()
+    {
+        return $"{Instruction:X4}";
+    }
 }

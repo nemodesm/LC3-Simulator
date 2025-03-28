@@ -1,5 +1,17 @@
 namespace LC3_Simulator;
 
+// MEMORY
+// MAR = Memory Address Register
+// MDR = Memory Data Register
+
+// Processing Unit
+// ALU = Arithmetic Logic Unit
+// TEMP = Temporary registers (R0-R7)
+
+// Control Unit ---- "The brain"
+// PC = Program Counter
+// IR = Instruction Register
+
 public class Simulator
 {
     // OPCode = 4 bits
@@ -45,6 +57,7 @@ public class Simulator
         PC = 0;
         CC = 0;
 
+        // TODO: this instruction set seems to be wrong
         Instructions = new()
         {
             { 0b0000, BR  },
@@ -60,7 +73,7 @@ public class Simulator
             { 0b1010, LDI },
             { 0b1011, STI },
             { 0b1100, JMP },
-            { 0b1101, RET },
+            { 0b1101, RET }, // FIXME: This is reserved, RET is actually JMP R7
             { 0b1110, LEA },
             { 0b1111, TRAP }, // TRAP
         };
@@ -117,7 +130,7 @@ public class Simulator
     /// </summary>
     /// <param name="unsigned">The unsigned 16-bit integer to convert.</param>
     /// <returns>The signed 16-bit integer equivalent to the given unsigned 16-bit integer.</returns>
-    public short UnsignedToSigned(ushort unsigned) => unsigned > 0x7FFF ? (short)(~unsigned + 1) : (short)unsigned;
+    public short UnsignedToSigned(ushort unsigned) => (short)unsigned;
 
     /// <summary>
     /// Converts an unsigned n-bit integer to a signed n-bit integer by performing two's complement.
@@ -158,9 +171,11 @@ public class Simulator
         instructionMethod(instruction);
     }
     
+    private bool _running = true;
+    
     public void Execute()
     {
-        while (true)
+        while (_running)
         {
 #if DEBUG
             Console.WriteLine((Memory[PC] >> 12) switch
@@ -177,8 +192,8 @@ public class Simulator
                 0b1001 => "NOT",
                 0b1010 => "LDI",
                 0b1011 => "STI",
-                0b1100 => "JMP",
-                0b1101 => "RET",
+                0b1100 => "JMP", // RET => JMP R7
+                0b1101 => "RET", // reserved
                 0b1110 => "LEA",
                 0b1111 => "TRAP",
                 _ => throw new ArgumentOutOfRangeException()
@@ -187,6 +202,12 @@ public class Simulator
             var ppc = PC++;
             ExecuteInstruction(new LC3Instruction(Memory[ppc]));
         }
+    }
+    
+    public void ExecuteStep()
+    {
+        var ppc = PC++;
+        ExecuteInstruction(new LC3Instruction(Memory[ppc]));
     }
     
     public void LoadFromFile(string inputFile)
@@ -200,6 +221,64 @@ public class Simulator
             // swap bytes
             Memory[index] = (ushort)((Memory[index] << 8) | (Memory[index] >> 8));
         }
+    }
+    
+    public static void RunProgram(string inputFile)
+    {
+        var sim = new Simulator();
+        sim.LoadFromFile(inputFile);
+        sim.Execute();
+    }
+
+    public static Thread RunProgramOnThread(string inputFile)
+    {
+        var thread = new Thread(() => RunProgram(inputFile));
+        thread.Start();
+        return thread;
+    }
+    
+    public void DumpMemory(string outputFile)
+    {
+        using (var writer = File.CreateText(outputFile))
+        {
+            writer.WriteLine("LC-3 Memory Dump");
+            writer.WriteLine($"=== {DateTime.Now} ===");
+            writer.WriteLine();
+            writer.WriteLine($"Registers:");
+            writer.WriteLine($"PC: {PC}");
+            writer.WriteLine($"CC: {CC}");
+            writer.WriteLine($"R0: {R0}");
+            writer.WriteLine($"R1: {R1}");
+            writer.WriteLine($"R2: {R2}");
+            writer.WriteLine($"R3: {R3}");
+            writer.WriteLine($"R4: {R4}");
+            writer.WriteLine($"R5: {R5}");
+            writer.WriteLine($"R6: {R6}");
+            writer.WriteLine($"R7: {R7}");
+            writer.WriteLine();
+            writer.WriteLine("Memory:");
+            for (var index = 0; index < Memory.Length; index+= 4)
+            {
+                writer.Write(Memory[index].ToString("b16"));
+                writer.Write(" ");
+                writer.Write(Memory[index + 1].ToString("b16"));
+                writer.Write(" ");
+                writer.Write(Memory[index + 2].ToString("b16"));
+                writer.Write(" ");
+                writer.Write(Memory[index + 3].ToString("b16"));
+                writer.Write(" -- ");
+                // rewrite in hex
+                writer.Write(Memory[index].ToString("x4"));
+                writer.Write(" ");
+                writer.Write(Memory[index + 1].ToString("x4"));
+                writer.Write(" ");
+                writer.Write(Memory[index + 2].ToString("x4"));
+                writer.Write(" ");
+                writer.Write(Memory[index + 3].ToString("x4"));
+                writer.WriteLine();
+            }
+        }
+        Console.WriteLine($"Memory dumped to {outputFile}");
     }
 
     #region OpCode Impl
@@ -224,7 +303,7 @@ public class Simulator
         }
         else
         {
-            src2 = UnsignedToSigned(instruction.GetBits(0, 5), 5); // TODO: this is immediate but needs to be sign extended
+            src2 = UnsignedToSigned(instruction.GetBits(0, 5), 5);
         }
 
         var sum = (ushort)(src1 + src2);
@@ -364,47 +443,21 @@ public class Simulator
         Console.WriteLine("TRAP reached, dumping memory");
         // TODO: actual implementation
         // for now, dumps memory to mem.dmp file and terminates
-        using (var writer = File.CreateText("mem.dmp"))
-        {
-            writer.WriteLine("LC-3 Memory Dump");
-            writer.WriteLine($"=== {DateTime.Now} ===");
-            writer.WriteLine();
-            writer.WriteLine($"Registers:");
-            writer.WriteLine($"PC: {PC}");
-            writer.WriteLine($"CC: {CC}");
-            writer.WriteLine($"R0: {R0}");
-            writer.WriteLine($"R1: {R1}");
-            writer.WriteLine($"R2: {R2}");
-            writer.WriteLine($"R3: {R3}");
-            writer.WriteLine($"R4: {R4}");
-            writer.WriteLine($"R5: {R5}");
-            writer.WriteLine($"R6: {R6}");
-            writer.WriteLine($"R7: {R7}");
-            writer.WriteLine();
-            writer.WriteLine("Memory:");
-            for (var index = 0; index < Memory.Length; index+= 4)
-            {
-                writer.Write(Memory[index].ToString("b16"));
-                writer.Write(" ");
-                writer.Write(Memory[index + 1].ToString("b16"));
-                writer.Write(" ");
-                writer.Write(Memory[index + 2].ToString("b16"));
-                writer.Write(" ");
-                writer.Write(Memory[index + 3].ToString("b16"));
-                writer.Write(" -- ");
-                // rewrite in hex
-                writer.Write(Memory[index].ToString("x4"));
-                writer.Write(" ");
-                writer.Write(Memory[index + 1].ToString("x4"));
-                writer.Write(" ");
-                writer.Write(Memory[index + 2].ToString("x4"));
-                writer.Write(" ");
-                writer.Write(Memory[index + 3].ToString("x4"));
-                writer.WriteLine();
-            }
-        }
-        Environment.Exit(0);
+        DumpMemory("mem.dmp");
+        _running = false;
     }
 
     #endregion
+
+    public void WriteMemoryToFile(string filename)
+    {
+        Console.WriteLine($"Writing to {filename}");
+        using (var writer = new BinaryWriter(File.Create(filename)))
+        {
+            foreach (var word in Memory)
+            {
+                writer.Write((ushort)(((word >> 8) & 0xFF) | ((word << 8) & 0xFF00)));
+            }
+        } 
+    }
 }
