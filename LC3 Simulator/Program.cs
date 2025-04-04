@@ -5,6 +5,11 @@ class Program
     static int Main(string[] args)
     {
 #if false
+        if (!Compiler.Compile("testProgram.lc3asm", out var si))
+        {
+            
+        }
+        
         Console.WriteLine($"{Compiler.IsLabelValid("R0")} == false");
         Console.WriteLine($"{Compiler.IsLabelValid("R1")} == false");
         Console.WriteLine($"{Compiler.IsLabelValid("R3")} == false");
@@ -17,40 +22,40 @@ class Program
         Console.WriteLine($"{Compiler.IsLabelValid("\\lebel")} == true");
         Console.WriteLine($"{Compiler.IsLabelValid("kjhg\\lebel2")} == false");
 
-        if (Compiler.Compile("testProgram.lc3asm", "testProgram.tmp"))
-        {
-            
-        }
-        
-        if(!CompilerV1.Compile("testProgram.lc3asm", "testProgram.bin"))
-        {
-            return 1;
-        }
-
-        var a = File.ReadAllText("testProgram.tmp");
-        var b = File.ReadAllText("testProgram.bin");
-        if (a != b)
-        {
-            return 1;
-        }
-
-        var sim = new Simulator();
-        sim.LoadFromFile("testProgram.bin");
-        sim.Memory[0x3003] = 0x3008;
-        sim.R0 = 0x0005;
-        sim.R1 = 0x000C;
-        sim.R2 = 0x0005;
-        sim.R3 = 0x0006;
-        sim.R4 = 0x0003;
-        sim.R5 = 0x0008;
-        sim.PC = 0x3000;
-        sim.ExecuteStep();
-        Console.WriteLine(sim.R0.ToString("X4"));
-        Console.WriteLine(sim.R1.ToString("X4"));
-        Console.WriteLine(sim.R2.ToString("X4"));
-        Console.WriteLine(sim.R3.ToString("X4"));
-        Console.WriteLine(sim.R4.ToString("X4"));
-        Console.WriteLine(sim.R5.ToString("X4"));
+        var s = new Simulator();
+        s.Memory[0x3000] = 0x7482;
+        s.Memory[0x300A] = 0x1234;
+        s.Memory[0x300B] = 0x2345;
+        s.Memory[0x300C] = 0x3456;
+        s.Memory[0x300D] = 0x4567;
+        s.Memory[0x300E] = 0x5678;
+        s.Memory[0x300F] = 0x6789;
+        s.R0 = 0x300A;
+        s.R1 = 0x3001;
+        s.R2 = 0x300B;
+        s.R3 = 0x3009;
+        s.R4 = 0x3008;
+        s.R5 = 0x3001;
+        s.R6 = 0x3002;
+        s.R7 = 0x3003;
+        s.PC = 0x3000;
+        s.ExecuteStep();
+        Console.WriteLine(s.Memory[0x300A].ToString("X4"));
+        Console.WriteLine(s.Memory[0x300B].ToString("X4"));
+        Console.WriteLine(s.Memory[0x300C].ToString("X4"));
+        Console.WriteLine(s.Memory[0x300D].ToString("X4"));
+        Console.WriteLine(s.Memory[0x300E].ToString("X4"));
+        Console.WriteLine(s.Memory[0x300F].ToString("X4"));
+        Console.WriteLine();
+        Console.WriteLine(s.R0.ToString("X4"));
+        Console.WriteLine(s.R1.ToString("X4"));
+        Console.WriteLine(s.R2.ToString("X4"));
+        Console.WriteLine(s.R3.ToString("X4"));
+        Console.WriteLine(s.R4.ToString("X4"));
+        Console.WriteLine(s.R5.ToString("X4"));
+        Console.WriteLine(s.R6.ToString("X4"));
+        Console.WriteLine(s.R7.ToString("X4"));
+        return 0;
 #endif
         if (args.Length == 0)
         {

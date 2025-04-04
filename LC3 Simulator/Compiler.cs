@@ -22,7 +22,8 @@ public static class Compiler
             { ".ORIG", ParseOrigin },
             { ".BLKW", ParseData },
             { ".FILL", ParseFill },
-            { ".STRINGZ", ParseString }
+            { ".STRINGZ", ParseString },
+            { ".END", ParseEnd }
         };
 
     public static Dictionary<string, Func<string[], LC3Instruction>> InstructionParserTable = new()
@@ -130,7 +131,7 @@ public static class Compiler
     
     public static bool IsPseudoInstruction(string token)
     {
-        return token is ".ORIG" or ".BLKW" or ".FILL" or ".STRINGZ";
+        return token is ".ORIG" or ".BLKW" or ".FILL" or ".STRINGZ" or ".END";
     }
 
     [Pure]
@@ -174,6 +175,8 @@ public static class Compiler
                 return 1;
             case ".BLKW":
                 return ushort.Parse(tokens[1]);
+            case ".END":
+                return 0;
             default:
                 throw new FormatException("Invalid data block");
         }
@@ -290,6 +293,7 @@ public static class Compiler
                 if (IsLabelValid(label))
                 {
                     labels[label] = address;
+                    lastLabel = label;
                 }
                 else
                 {
@@ -298,6 +302,11 @@ public static class Compiler
                 }
 
                 line = restOfLine;
+            }
+            else
+            {
+                RegisterError("Label not followed by colon");
+                valid = false;
             }
 
             EndOfLoop:
@@ -316,7 +325,7 @@ public static class Compiler
         address = 0;
         for (var index = 0; index < lines.Length; index++)
         {
-            var line = lines[index];
+            var line = lines[index].TrimEnd();
             if (GetAddressFromCustomInstruction(line.Trim(), out var newAddress))
             {
                 address = newAddress.Value;
@@ -325,10 +334,20 @@ public static class Compiler
             }
             foreach (var label in labels)
             {
-                if (line.Contains($",{label.Key},") || line.EndsWith($",{label.Key}"))
+                if (line.Contains($",{label.Key},"))
                 {
                     Console.WriteLine($"Replacing {label.Key} with #${label.Value - address:X} ({label.Value:X} - {address:X})");
-                    line = line.Replace(label.Key, $",#${label.Value - address:X},");
+                    line = line.Replace($",{label.Key},", $",#${label.Value - address:X},");
+                }
+                else if (line.EndsWith($",{label.Key}"))
+                {
+                    Console.WriteLine($"Replacing {label.Key} with #${label.Value - address:X} ({label.Value:X} - {address:X})");
+                    line = line.Replace($",{label.Key}", $",#${label.Value - address:X}");
+                }
+                else if (line.EndsWith($" {label.Key}"))
+                {
+                    Console.WriteLine($"Replacing {label.Key} with #${label.Value - address:X} ({label.Value:X} - {address:X})");
+                    line = line.Replace($" {label.Key}", $" #${label.Value - address:X}");
                 }
                 else if (line.Contains($" {label.Key},"))
                 {
@@ -379,17 +398,35 @@ public static class Compiler
         }
         if (IsPseudoInstruction(tokens[0]))
         {
-            var inst = PseudoInstructionParserTable[tokens[0]](tokens.SelectMany(token => token.Split(',')).ToArray());
-            for (var i = 0; i < inst.nWords; i++)
+            try
             {
-                SetSimulatorMemory(inst.words is null ? (ushort)0 : inst.words[i].Instruction);
+                var inst = PseudoInstructionParserTable[tokens[0]](tokens.SelectMany(token => token.Split(','))
+                    .ToArray());
+                for (var i = 0; i < inst.nWords; i++)
+                {
+                    SetSimulatorMemory(inst.words is null ? (ushort)0 : inst.words[i].Instruction);
+                }
             }
+            catch (Exception e)
+            {
+                RegisterError(e.Message);
+                return false;
+            }
+
             return true;
         }
         if (IsLC3Instruction(tokens[0]))
         {
-            var instruction = InstructionParserTable[tokens[0]](tokens.SelectMany(token => token.Split(',')).ToArray());
-            SetSimulatorMemory(instruction.Instruction);
+            try
+            {
+                var instruction = InstructionParserTable[tokens[0]](tokens.SelectMany(token => token.Split(',')).ToArray());
+                SetSimulatorMemory(instruction.Instruction);
+            }
+            catch (Exception e)
+            {
+                RegisterError(e.Message);
+                return false;
+            }
             return true;
         }
         RegisterError("Invalid instruction");
@@ -414,7 +451,7 @@ public static class Compiler
         {
             RegisterError("Invalid fill instruction");
         }
-        return (1, [new LC3Instruction(ParseNumber(tokens[0], 16))]);
+        return (1, [new LC3Instruction(ParseNumber(tokens[1], 16))]);
     }
     
     public static (int, LC3Instruction[]?) ParseData(string[] tokens)
@@ -423,7 +460,7 @@ public static class Compiler
         {
             RegisterError("Invalid data instruction");
         }
-        return (ParseNumber(tokens[1], 16), null);
+        return (ParseNumber($"#{tokens[1]}", 16), null);
     }
     
     public static (int, LC3Instruction[]?) ParseString(string[] tokens)
@@ -433,6 +470,15 @@ public static class Compiler
             RegisterError("Invalid string instruction");
         }
         return (tokens[1].Length + 1, tokens[1].Select(c => new LC3Instruction(c)).Append(new LC3Instruction(0)).ToArray());
+    }
+    
+    public static (int, LC3Instruction[]?) ParseEnd(string[] tokens)
+    {
+        if (tokens.Length != 1)
+        {
+            RegisterError("Invalid end instruction");
+        }
+        return (0, null);
     }
 
     #endregion
